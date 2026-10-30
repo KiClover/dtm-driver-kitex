@@ -1,2 +1,5 @@
 .idea/
 .tmp_env.txt
+
+# Local planning and research notes stay on disk but out of version control.
+docs/
