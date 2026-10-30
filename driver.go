@@ -36,7 +36,12 @@ func (d *Driver) RegisterService(target string, endpoint string) error {
 // ParseServerMethod splits a branch URL into the resolver target and the
 // fully-qualified gRPC method.
 func (d *Driver) ParseServerMethod(uri string) (server string, method string, err error) {
-	return "", "", nil // TODO(Task 2): implement strict parsing.
+	bt, err := parseBranchTarget(uri)
+	if err != nil {
+		return "", "", err
+	}
+	defaultConfig.start()
+	return bt.server, bt.method, nil
 }
 
 // Builder adapts a Kitex discovery resolver into a grpc-go resolver builder.
