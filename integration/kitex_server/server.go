@@ -1,4 +1,4 @@
-﻿// Package kitex_server runs a real Kitex protobuf server for integration
+// Package kitex_server runs a real Kitex protobuf server for integration
 // tests. It is deliberately boring: one unary method, standard gRPC transport,
 // and the DTM metadata bridge installed as server middleware.
 package kitex_server

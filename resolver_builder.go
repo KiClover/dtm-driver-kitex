@@ -16,10 +16,6 @@ type resolverBuilder struct {
 	scheme string
 }
 
-func (b *resolverBuilder) Build(target resolver.Target, cc resolver.ClientConn, opts resolver.BuildOptions) (resolver.Resolver, error) {
-	return nil, nil // TODO(Task 6)
-}
-
 func (b *resolverBuilder) Scheme() string { return b.scheme }
 
 func init() {
