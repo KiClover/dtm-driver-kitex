@@ -4,10 +4,6 @@
 package dtmkitex
 
 import (
-	"context"
-
-	"google.golang.org/grpc/resolver"
-
 	dtmdriver "github.com/dtm-labs/dtmdriver"
 )
 
@@ -44,22 +40,9 @@ func (d *Driver) ParseServerMethod(uri string) (server string, method string, er
 }
 
 // Builder adapts a Kitex discovery resolver into a grpc-go resolver builder.
-type Builder struct{}
-
-// Build implements resolver.Builder.
-func (b *Builder) Build(target resolver.Target, cc resolver.ClientConn, opts resolver.BuildOptions) (resolver.Resolver, error) {
-	return nil, nil // TODO(Task 6): implement resolver adapter.
-}
-
-// Scheme implements resolver.Builder.
-func (b *Builder) Scheme() string { return SchemeEtcd }
-
-// Configure applies driver configuration from a JSON string (DTM
-// DriverOptions). TODO(Task 3): implement strict decoding and freeze.
-func (d *Driver) Configure(raw string) error { return nil }
-
-// Shutdown deregisters all services and closes owned clients. TODO(Task 7).
-func (d *Driver) Shutdown(ctx context.Context) error { return nil }
+// It is retained as a public alias for documentation; the concrete builder is
+// resolverBuilder in resolver_builder.go.
+type Builder = resolverBuilder
 
 func init() {
 	dtmdriver.Register(&Driver{})
