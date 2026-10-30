@@ -148,7 +148,9 @@ func parseDirectTarget(raw string) (branchTarget, error) {
 func parseRegistryTarget(raw string, withMethod bool) (*discoveryConfig, string, error) {
 	u, err := url.Parse(raw)
 	if err != nil {
-		return nil, "", fmt.Errorf("dtm-driver-kitex: invalid target URL: %v", err)
+		// url.Parse echoes the raw URL, which may carry inline secrets; never
+		// surface it in an error.
+		return nil, "", fmt.Errorf("dtm-driver-kitex: invalid target URL (malformed host, port, or escaping)")
 	}
 	if u.User != nil {
 		return nil, "", fmt.Errorf("dtm-driver-kitex: target must not contain userinfo")

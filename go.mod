@@ -5,6 +5,7 @@ go 1.22
 require (
 	github.com/dtm-labs/dtmdriver v0.0.6
 	google.golang.org/grpc v1.59.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

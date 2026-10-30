@@ -3,6 +3,7 @@ package dtmkitex
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -28,20 +29,11 @@ var ErrAlreadyStarted = fmt.Errorf("dtm-driver-kitex: configuration already froz
 type configState struct {
 	mu      sync.RWMutex
 	cfg     Config
-	frozen  bool
+	creds   *credentialSet
 	started bool
 }
 
 var defaultConfig = &configState{}
-
-// freeze marks configuration as immutable; called before first runtime use.
-func (s *configState) freeze() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if !s.frozen {
-		s.frozen = true
-	}
-}
 
 // start marks the runtime as started; later Configure calls fail.
 func (s *configState) start() {
@@ -50,14 +42,25 @@ func (s *configState) start() {
 	s.started = true
 }
 
-// apply stores cfg unless the runtime already started.
+// apply validates and stores cfg unless the runtime already started. The
+// credential file is loaded before the snapshot is published.
 func (s *configState) apply(cfg Config) error {
+	var set *credentialSet
+	if cfg.CredentialFile != "" {
+		loaded, err := loadCredentialProfiles(cfg.CredentialFile)
+		if err != nil {
+			return err
+		}
+		set = loaded
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.started {
 		return ErrAlreadyStarted
 	}
 	s.cfg = cfg
+	s.creds = set
 	return nil
 }
 
@@ -79,7 +82,7 @@ func Configure(cfg Config) error {
 // DriverOptions) with strict unknown-field rejection and applies it.
 func (d *Driver) Configure(raw string) error {
 	var cfg Config
-	dec := json.NewDecoder(stringsReader(raw))
+	dec := json.NewDecoder(strings.NewReader(raw))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&cfg); err != nil {
 		return fmt.Errorf("dtm-driver-kitex: invalid driver options: %w", err)
