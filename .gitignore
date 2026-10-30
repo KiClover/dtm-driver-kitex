@@ -3,3 +3,6 @@
 
 # Local planning and research notes stay on disk but out of version control.
 docs/
+
+DTM_KITEX_PLUGIN_DESIGN.md
+DTM_KITEX_PLUGIN_RESEARCH.md
