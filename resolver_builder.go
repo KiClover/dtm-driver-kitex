@@ -24,5 +24,15 @@ func init() {
 	}
 }
 
-// Shutdown deregisters all services and closes owned registry clients. TODO(Task 7).
-func (d *Driver) Shutdown(ctx context.Context) error { return nil }
+// Shutdown deregisters all services and closes owned registry clients.
+// Errors from individual backends are collected; the first is returned.
+func (d *Driver) Shutdown(ctx context.Context) error {
+	var firstErr error
+	if err := defaultRegistrations.deregisterAll(); err != nil && firstErr == nil {
+		firstErr = err
+	}
+	if err := defaultProviders.closeAll(ctx); err != nil && firstErr == nil {
+		firstErr = err
+	}
+	return firstErr
+}

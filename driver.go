@@ -30,7 +30,17 @@ func (d *Driver) RegisterAddrResolver() {}
 
 // RegisterService registers the DTM server endpoint under the given target.
 func (d *Driver) RegisterService(target string, endpoint string) error {
-	return nil // TODO(Task 7): implement via registry manager.
+	defaultConfig.start()
+	rt, err := parseRegistrationTarget(target)
+	if err != nil {
+		return err
+	}
+	dc := rt.discovery
+	creds, err := defaultConfig.resolveCredentials(dc)
+	if err != nil {
+		return err
+	}
+	return registerService(dc, creds, endpoint)
 }
 
 // ParseServerMethod splits a branch URL into the resolver target and the
