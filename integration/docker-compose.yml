@@ -1,6 +1,6 @@
-# Dedicated registry for the Gate C integration tests
-# (go test ./integration -run TestEtcd). The tests skip automatically when
-# nothing answers on 127.0.0.1:12380.
+# Dedicated registries for the integration tests
+# (go test ./integration -run 'TestEtcd|TestConsul'). The tests skip
+# automatically when nothing answers on the mapped ports.
 services:
   etcd:
     image: etcd:v3.5.17
@@ -11,3 +11,11 @@ services:
       - --advertise-client-urls=http://127.0.0.1:12380
     ports:
       - "12380:2379"
+
+  consul:
+    image: hashicorp/consul:1.20
+    container_name: dtm-kitex-test-consul
+    command: agent -dev -client=0.0.0.0
+    ports:
+      - "18500:8500"
+

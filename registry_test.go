@@ -56,7 +56,8 @@ func TestNewRegistrationInfoValidation(t *testing.T) {
 		{"slash service", "a/b", "127.0.0.1:8080", 10, true},
 		{"no port", "svc", "127.0.0.1", 10, true},
 		{"bad port", "svc", "127.0.0.1:abc", 10, true},
-		{"bad host", "svc", "notahost:8080", 10, true},
+		{"hostname accepted", "svc", "host.docker.internal:8080", 10, false},
+		{"empty port", "svc", "host.docker.internal:", 10, true},
 		{"negative weight", "svc", "127.0.0.1:8080", -1, true},
 		{"zero weight tolerated", "svc", "127.0.0.1:8080", 0, false},
 	}
@@ -98,6 +99,19 @@ func TestNewRegistrationInfoShape(t *testing.T) {
 	tags["mutated"] = "yes"
 	if _, mutated := info.Tags["mutated"]; mutated {
 		t.Error("Tags must be deep-copied")
+	}
+}
+
+func TestNewRegistrationInfoHostnameAddr(t *testing.T) {
+	info, err := newRegistrationInfo("svc", "host.docker.internal:9090", 10, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Addr.String(); got != "host.docker.internal:9090" {
+		t.Errorf("hostname addr = %q", got)
+	}
+	if info.Addr.Network() != "tcp" {
+		t.Errorf("network = %q", info.Addr.Network())
 	}
 }
 

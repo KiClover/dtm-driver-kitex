@@ -71,6 +71,12 @@ type Server struct {
 // Addr returns the bound host:port.
 func (s *Server) Addr() string { return s.addr }
 
+// Port returns the bound port as a decimal string.
+func (s *Server) Port() string {
+	_, port, _ := net.SplitHostPort(s.addr)
+	return port
+}
+
 // Stop shuts the server down and waits for Run to return.
 //
 // On Windows the Kitex gonet transport calls os.Exit(1) as soon as an accept
@@ -99,9 +105,16 @@ func (s *Server) Stop() {
 // needed 鈥?a probe connection would race with shutdown inside Kitex's HTTP/2
 // transport.
 func Start(tb testing.TB) *Server {
+	return StartOn(tb, "127.0.0.1")
+}
+
+// StartOn is Start with a configurable listen host. Registry integration
+// tests listen on 0.0.0.0 when the health check runs inside a container and
+// must reach the server from outside the host loopback.
+func StartOn(tb testing.TB, host string) *Server {
 	tb.Helper()
 
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	ln, err := net.Listen("tcp", net.JoinHostPort(host, "0"))
 	if err != nil {
 		tb.Fatalf("listen: %v", err)
 	}

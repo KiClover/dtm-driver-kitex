@@ -3,6 +3,7 @@ package dtmkitex
 import (
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -109,20 +110,25 @@ func newRegistrationInfo(serviceName, endpoint string, weight int, tags map[stri
 	if err != nil || p <= 0 {
 		return registry.Info{}, fmt.Errorf("dtm-driver-kitex: endpoint %q has invalid tcp port %q", endpoint, port)
 	}
-	ip := net.ParseIP(host)
-	if ip == nil {
-		return registry.Info{}, fmt.Errorf("dtm-driver-kitex: endpoint %q has unparseable host", endpoint)
-	}
 	if weight < 0 {
 		return registry.Info{}, fmt.Errorf("dtm-driver-kitex: weight %d must not be negative", weight)
 	}
+	// Hosts may be IP literals or DNS names (k8s services, docker host
+	// aliases). Kitex registry SDKs format the registration address from the
+	// net.Addr (String/SplitHostPort), so a hostname is carried verbatim in
+	// hostnameAddr instead of being eagerly resolved into a possibly
+	// context-wrong IP.
 	info := registry.Info{
 		ServiceName:    serviceName,
-		Addr:           &net.TCPAddr{IP: ip, Port: p},
 		PayloadCodec:   "protobuf",
 		Weight:         weight,
 		Tags:           copyTags(tags),
 		SkipListenAddr: true,
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		info.Addr = &net.TCPAddr{IP: ip, Port: p}
+	} else {
+		info.Addr = hostnameAddr{host: host, port: p}
 	}
 	return info, nil
 }
@@ -137,3 +143,16 @@ func copyTags(tags map[string]string) map[string]string {
 	}
 	return out
 }
+
+// hostnameAddr carries a DNS-name endpoint into the registry SDKs. Both
+// registry-etcd and registry-consul format the registration address with
+// net.SplitHostPort/String(), so implementing net.Addr with the name kept
+// verbatim stores the hostname in the registry instead of an eagerly
+// resolved (and possibly context-wrong) IP.
+type hostnameAddr struct {
+	host string
+	port int
+}
+
+func (a hostnameAddr) Network() string { return "tcp" }
+func (a hostnameAddr) String() string  { return net.JoinHostPort(a.host, strconv.Itoa(a.port)) }
