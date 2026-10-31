@@ -1,5 +1,5 @@
 # Dedicated registries for the integration tests
-# (go test ./integration -run 'TestEtcd|TestConsul'). The tests skip
+# (go test ./integration -run 'TestEtcd|TestConsul|TestNacos'). The tests skip
 # automatically when nothing answers on the mapped ports.
 services:
   etcd:
@@ -18,4 +18,16 @@ services:
     command: agent -dev -client=0.0.0.0
     ports:
       - "18500:8500"
+
+  nacos:
+    image: nacos/nacos-server:v2.2.3
+    container_name: dtm-kitex-test-nacos
+    environment:
+      - MODE=standalone
+      - NACOS_AUTH_ENABLE=false
+    # 9848 is the v2 gRPC port (+1000 offset from 8848): explicit for nacos
+    # 2.x SDKs even though the v1.x HTTP SDK used here only needs 8848.
+    ports:
+      - "8848:8848"
+      - "9848:9848"
 
