@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dtm-labs/client/dtmgrpc/dtmgimp"
+	"github.com/dtm-labs/dtm/client/dtmgrpc/dtmgimp"
 	order "github.com/dtm-labs/dtmdriver-kitex/integration/kitex_gen/order"
 	"github.com/dtm-labs/dtmdriver-kitex/integration/kitex_server"
 	"google.golang.org/grpc"

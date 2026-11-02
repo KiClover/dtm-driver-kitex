@@ -6,3 +6,9 @@ docs/
 
 DTM_KITEX_PLUGIN_DESIGN.md
 DTM_KITEX_PLUGIN_RESEARCH.md
+
+# Task 10 test artifacts
+.tmp_dtm.log
+.tmp_*.go
+integration/dtm_server/*.exe
+integration/dtm_server/sqls/

@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	kitexmetadata "github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
-	"github.com/dtm-labs/client/dtmgrpc"
+	"github.com/dtm-labs/dtm/client/dtmgrpc"
 	grpcmetadata "google.golang.org/grpc/metadata"
 )
 

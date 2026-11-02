@@ -16,7 +16,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	npstatus "github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 	"github.com/cloudwego/kitex/server"
-	"github.com/dtm-labs/client/dtmgrpc"
+	"github.com/dtm-labs/dtm/client/dtmgrpc"
 	dtmkitex "github.com/dtm-labs/dtmdriver-kitex"
 	order "github.com/dtm-labs/dtmdriver-kitex/integration/kitex_gen/order"
 	"github.com/dtm-labs/dtmdriver-kitex/integration/kitex_gen/order/orderservice"
@@ -34,22 +34,28 @@ type Handler struct{}
 // convertStatus); a grpc status error falls through to codes.Internal with a
 // flattened message, which would break the DTM status contract.
 func (h *Handler) Create(ctx context.Context, req *order.CreateRequest) (*order.CreateResponse, error) {
-	switch req.GetFailWith() {
-	case "aborted":
-		return nil, npstatus.Errorf(codes.Aborted, "branch failed")
-	case "ongoing":
-		return nil, npstatus.Errorf(codes.FailedPrecondition, "ONGOING")
-	case "unavailable":
-		return nil, npstatus.Errorf(codes.Unavailable, "registry unreachable")
-	case "biz-error":
-		// A business error that is not a DTM status must not be mistaken for a
-		// definite failure by the DTM server.
-		return nil, errors.New("inventory not enough")
-	}
-
 	barrier, err := dtmgrpc.BarrierFromGrpc(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("BarrierFromGrpc: %w", err)
+	}
+	// DTM retries a failing action but compensation must land: the injected
+	// error only fires for action branches, never for compensate branches
+	// (whose dtm-op metadata the bridge delivers). Re-ordering the check
+	// after BarrierFromGrpc also proves the bridge works on the compensate
+	// path.
+	if barrier.Op != "compensate" {
+		switch req.GetFailWith() {
+		case "aborted":
+			return nil, npstatus.Errorf(codes.Aborted, "branch failed")
+		case "ongoing":
+			return nil, npstatus.Errorf(codes.FailedPrecondition, "ONGOING")
+		case "unavailable":
+			return nil, npstatus.Errorf(codes.Unavailable, "registry unreachable")
+		case "biz-error":
+			// A business error that is not a DTM status must not be mistaken
+			// for a definite failure by the DTM server.
+			return nil, errors.New("inventory not enough")
+		}
 	}
 	return &order.CreateResponse{
 		OrderId:         req.GetOrderId(),
