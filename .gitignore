@@ -12,3 +12,7 @@ DTM_KITEX_PLUGIN_RESEARCH.md
 .tmp_*.go
 integration/dtm_server/*.exe
 integration/dtm_server/sqls/
+
+# Integration harness and CI stay local-only per decision on 2026-11-02.
+integration/
+.github/
