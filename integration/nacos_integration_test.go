@@ -18,11 +18,11 @@ import (
 )
 
 const (
-	nacosEndpoint  = "127.0.0.1:8848"
-	nacosService   = "dtm-nacos-gate"
-	nacosTarget    = "kitex-nacos://" + nacosEndpoint + "/" + nacosService
-	nacosConsole   = "http://" + nacosEndpoint + "/nacos"
-	nacosHTTPPath  = methodPath // "/order.OrderService/Create"
+	nacosEndpoint = "127.0.0.1:8848"
+	nacosService  = "dtm-nacos-gate"
+	nacosTarget   = "kitex-nacos://" + nacosEndpoint + "/" + nacosService
+	nacosConsole  = "http://" + nacosEndpoint + "/nacos"
+	nacosHTTPPath = methodPath // "/order.OrderService/Create"
 )
 
 // nacosReachable probes the nacos console; integration tests skip when the

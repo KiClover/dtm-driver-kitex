@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dtm-labs/dtm/client/dtmgrpc"
 	dtmkitex "github.com/dtm-labs/dtmdriver-kitex"
 	"github.com/dtm-labs/dtmdriver-kitex/integration/kitex_gen/order"
 	"github.com/dtm-labs/dtmdriver-kitex/integration/kitex_server"
-	"github.com/dtm-labs/dtm/client/dtmgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )

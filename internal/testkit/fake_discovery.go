@@ -16,9 +16,9 @@ import (
 type Discovery struct {
 	mu sync.Mutex
 
-	name    string
-	desc    string
-	targets int
+	name     string
+	desc     string
+	targets  int
 	resolves int
 
 	resolveErr error
