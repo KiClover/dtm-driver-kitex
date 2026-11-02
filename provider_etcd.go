@@ -10,9 +10,8 @@ import (
 )
 
 // newEtcdOptions maps the normalized URI config and credentials onto
-// registry-etcd's exported Config. Options are written by hand instead of
-// WithTLSOpt/WithAuthOpt so a TLS failure can never silently fall back to a
-// plaintext client.
+// registry-etcd's exported Config. The URI controls endpoints, authentication,
+// dial timeout, and service discovery behavior.
 func newEtcdOptions(dc *discoveryConfig, creds credentialProfile) ([]etcd.Option, *clientv3.Config, error) {
 	etcdCfg := &clientv3.Config{
 		Endpoints:   append([]string(nil), dc.endpoints...),
@@ -29,13 +28,6 @@ func newEtcdOptions(dc *discoveryConfig, creds credentialProfile) ([]etcd.Option
 		etcdCfg.Username = creds.User
 		etcdCfg.Password = creds.Password
 	}
-	tlsCfg, err := buildTLSConfig(creds)
-	if err != nil {
-		return nil, nil, err
-	}
-	if tlsCfg != nil {
-		etcdCfg.TLS = tlsCfg
-	}
 
 	opts := []etcd.Option{func(cfg *etcd.Config) {
 		cfg.EtcdConfig = etcdCfg
@@ -49,14 +41,9 @@ func newEtcdOptions(dc *discoveryConfig, creds credentialProfile) ([]etcd.Option
 	return opts, etcdCfg, nil
 }
 
-// newEtcdProvider builds the etcd discovery resolver and registration
-// registry. registry-etcd v0.2.6 owns one clientv3.Client per object and
-// exposes no Close, so closeFn stays nil; Shutdown relies on Deregister to
-// stop the keepalive goroutines. Note: registry-etcd derives the Deregister
-// key from info.Addr plus the KITEX_IP_TO_REGISTRY/KITEX_PORT_TO_REGISTRY
-// environment (Register uses the pinned address instead), so a deregistration
-// with those variables set may target a stale key; the lease TTL then
-// reclaims the registration.
+// newEtcdProvider builds the etcd discovery resolver and registry. The
+// registry-etcd version used here exposes no Close, so the shared clients live
+// for the process lifetime and leases reclaim registrations after process loss.
 func newEtcdProvider(dc *discoveryConfig, creds credentialProfile) (*provider, error) {
 	opts, _, err := newEtcdOptions(dc, creds)
 	if err != nil {
@@ -72,10 +59,8 @@ func newEtcdProvider(dc *discoveryConfig, creds credentialProfile) (*provider, e
 		return nil, fmt.Errorf("dtm-driver-kitex: create etcd registry: %w", err)
 	}
 	return &provider{
-		name:      "etcd",
 		discovery: disc,
 		registry:  reg,
-		closeFn:   nil,
 		pinAddress: func(addr net.Addr) error {
 			etcd.SetFixedAddress(reg, addr)
 			return nil

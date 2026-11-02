@@ -79,6 +79,63 @@ func TestBuildViaDialTarget(t *testing.T) {
 	}
 }
 
+func TestBuildAcceptsInlineCredentials(t *testing.T) {
+	resetRegistrationState(t)
+	installFakeProvider(t, SchemeEtcd, NewRegistry(), nil)
+	u, err := url.Parse("kitex-etcd://127.0.0.1:2379/dtm-build-target?user=dtm&password=secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := resolver.Get(SchemeEtcd).Build(resolver.Target{URL: *u}, NewClientConn(), resolver.BuildOptions{})
+	if err != nil {
+		t.Fatalf("Build with URI credentials: %v", err)
+	}
+	r.Close()
+}
+
+func TestProviderCacheSeparatesCredentials(t *testing.T) {
+	resetRegistrationState(t)
+	installFakeProvider(t, SchemeEtcd, NewRegistry(), nil)
+	dc := mustConfig(t, SchemeEtcd+"://127.0.0.1:2379/svc")
+
+	first, err := defaultProviders.get(dc, credentialProfile{User: "dtm", Password: "first"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := defaultProviders.get(dc, credentialProfile{User: "dtm", Password: "second"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := defaultProviders.get(dc, credentialProfile{User: "dtm", Password: "first"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first == second {
+		t.Fatal("different credentials reused one provider")
+	}
+	if first != again {
+		t.Fatal("identical credentials did not reuse provider")
+	}
+}
+
+func TestProviderCacheSeparatesDelimiterContainingCredentials(t *testing.T) {
+	resetRegistrationState(t)
+	installFakeProvider(t, SchemeEtcd, NewRegistry(), nil)
+	dc := mustConfig(t, SchemeEtcd+"://127.0.0.1:2379/svc")
+
+	first, err := defaultProviders.get(dc, credentialProfile{User: "a", Password: "b\x00c"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := defaultProviders.get(dc, credentialProfile{User: "a\x00b", Password: "c"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first == second {
+		t.Fatal("distinct delimiter-containing credentials reused one provider")
+	}
+}
+
 // TestBuildSchemeMismatch checks that a builder rejects a target whose scheme
 // differs from the scheme it was registered for.
 func TestBuildSchemeMismatch(t *testing.T) {

@@ -75,33 +75,6 @@ func TestNacosGroupClusterNamespace(t *testing.T) {
 	}
 }
 
-// TestNacosNamespaceProfileFallback uses the profile namespace when the query
-// carries none, and the query wins when both are present.
-func TestNacosNamespaceProfileFallback(t *testing.T) {
-	dc := &discoveryConfig{
-		scheme:    SchemeNacos,
-		endpoints: []string{"127.0.0.1:8848"},
-		service:   "svc",
-		query:     url.Values{},
-	}
-	cfg, _, err := newNacosConfig(dc, credentialProfile{Namespace: "ns-profile"})
-	if err != nil {
-		t.Fatalf("newNacosConfig: %v", err)
-	}
-	if cfg.NamespaceId != "ns-profile" {
-		t.Errorf("NamespaceId = %q, want ns-profile", cfg.NamespaceId)
-	}
-
-	dc.query = url.Values{"namespace": {"ns-query"}}
-	cfg, _, err = newNacosConfig(dc, credentialProfile{Namespace: "ns-profile"})
-	if err != nil {
-		t.Fatalf("newNacosConfig: %v", err)
-	}
-	if cfg.NamespaceId != "ns-query" {
-		t.Errorf("NamespaceId = %q, want ns-query (query wins)", cfg.NamespaceId)
-	}
-}
-
 // TestNacosCredentialPairing rejects a lone username or password.
 func TestNacosCredentialPairing(t *testing.T) {
 	dc := &discoveryConfig{
@@ -163,14 +136,8 @@ func TestNacosProviderConstruction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newNacosProvider: %v", err)
 	}
-	if p.name != "nacos" {
-		t.Errorf("name = %q, want nacos", p.name)
-	}
 	if p.discovery == nil || p.registry == nil {
 		t.Fatal("provider missing discovery or registry")
-	}
-	if p.closeFn != nil {
-		t.Error("closeFn set: nacos-sdk-go v1 exposes no Close")
 	}
 }
 

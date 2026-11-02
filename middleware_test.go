@@ -11,6 +11,15 @@ import (
 	grpcmetadata "google.golang.org/grpc/metadata"
 )
 
+const (
+	metadataGID       = "dtm-gid"
+	metadataTransType = "dtm-trans_type"
+	metadataBranchID  = "dtm-branch_id"
+	metadataOp        = "dtm-op"
+	metadataDTM       = "dtm-dtm"
+	metadataPhase2URL = "dtm-phase2_url"
+)
+
 // kitexContext builds a Kitex server-side context carrying md.
 func kitexContext(md kitexmetadata.MD) context.Context {
 	return kitexmetadata.NewIncomingContext(context.Background(), md)
@@ -36,24 +45,24 @@ func capturedMetadata(t *testing.T, ctx context.Context) (grpcmetadata.MD, bool)
 
 func TestServerMetadataMiddlewareDTMHeaders(t *testing.T) {
 	ctx := kitexContext(kitexmetadata.MD{
-		MetadataGid:       {"gid-1"},
-		MetadataTransType: {"saga"},
-		MetadataBranchID:  {"01"},
-		MetadataOp:        {"action"},
-		MetadataDtm:       {"http://dtm:36789"},
-		MetadataPhase2URL: {"http://svc/phase2"},
+		metadataGID:       {"gid-1"},
+		metadataTransType: {"saga"},
+		metadataBranchID:  {"01"},
+		metadataOp:        {"action"},
+		metadataDTM:       {"http://dtm:36789"},
+		metadataPhase2URL: {"http://svc/phase2"},
 	})
 	md, ok := capturedMetadata(t, ctx)
 	if !ok {
 		t.Fatal("bridged context carries no grpc metadata")
 	}
 	want := map[string]string{
-		MetadataGid:       "gid-1",
-		MetadataTransType: "saga",
-		MetadataBranchID:  "01",
-		MetadataOp:        "action",
-		MetadataDtm:       "http://dtm:36789",
-		MetadataPhase2URL: "http://svc/phase2",
+		metadataGID:       "gid-1",
+		metadataTransType: "saga",
+		metadataBranchID:  "01",
+		metadataOp:        "action",
+		metadataDTM:       "http://dtm:36789",
+		metadataPhase2URL: "http://svc/phase2",
 	}
 	for key, value := range want {
 		got := md.Get(key)
@@ -70,7 +79,7 @@ func TestServerMetadataMiddlewareLowercasesKeys(t *testing.T) {
 		"DTM-BRANCH_ID": {"02"},
 	})
 	md, _ := capturedMetadata(t, ctx)
-	for _, key := range []string{MetadataGid, "x-custom-key", MetadataBranchID} {
+	for _, key := range []string{metadataGID, "x-custom-key", metadataBranchID} {
 		if len(md.Get(key)) != 1 {
 			t.Fatalf("md.Get(%q) = %v", key, md.Get(key))
 		}
@@ -88,7 +97,7 @@ func TestServerMetadataMiddlewarePreservesValuesAndUnknownKeys(t *testing.T) {
 		"x-multi":   {"a", "b", "c"},
 		"x-bin-bin": {binary},
 		"x-unknown": {"keep-me"},
-		MetadataGid: {"gid"},
+		metadataGID: {"gid"},
 	})
 	md, _ := capturedMetadata(t, ctx)
 	if got := md.Get("x-multi"); len(got) != 3 || got[0] != "a" || got[2] != "c" {
@@ -145,7 +154,7 @@ func TestServerMetadataMiddlewareWithoutMetadata(t *testing.T) {
 func TestServerMetadataMiddlewarePropagatesError(t *testing.T) {
 	sentinel := errors.New("handler failed")
 	next := func(context.Context, interface{}, interface{}) error { return sentinel }
-	err := ServerMetadataMiddleware(next)(kitexContext(kitexmetadata.MD{MetadataGid: {"g"}}), nil, nil)
+	err := ServerMetadataMiddleware(next)(kitexContext(kitexmetadata.MD{metadataGID: {"g"}}), nil, nil)
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("error = %v, want sentinel", err)
 	}
@@ -153,11 +162,11 @@ func TestServerMetadataMiddlewarePropagatesError(t *testing.T) {
 
 func TestBarrierFromBridgedContext(t *testing.T) {
 	ctx := kitexContext(kitexmetadata.MD{
-		MetadataGid:       {"gid-barrier"},
-		MetadataTransType: {"saga"},
-		MetadataBranchID:  {"07"},
-		MetadataOp:        {"action"},
-		MetadataDtm:       {"http://dtm:36789"},
+		metadataGID:       {"gid-barrier"},
+		metadataTransType: {"saga"},
+		metadataBranchID:  {"07"},
+		metadataOp:        {"action"},
+		metadataDTM:       {"http://dtm:36789"},
 	})
 
 	var barrierInfo struct {

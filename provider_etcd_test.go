@@ -87,14 +87,6 @@ func TestEtcdOptionsInlineCredentials(t *testing.T) {
 	}
 }
 
-func TestEtcdOptionsTLSFromProfile(t *testing.T) {
-	dc := etcdDC(t, "kitex-etcd://127.0.0.1:2379/svc")
-	creds := credentialProfile{TLSCA: "testdata/ca.pem", TLSCert: "testdata/cert.pem", TLSKey: "testdata/key.pem"}
-	if _, _, err := newEtcdOptions(dc, creds); err == nil {
-		t.Fatal("want TLS material error: testdata certs do not exist")
-	}
-}
-
 func TestEtcdOptionsPrefixAndWeight(t *testing.T) {
 	dc := etcdDC(t, "kitex-etcd://127.0.0.1:2379/svc?prefix=dtm/services&default_weight=7")
 	opts, _, err := newEtcdOptions(dc, credentialProfile{})
@@ -131,9 +123,6 @@ func TestEtcdProviderConstruction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.name != "etcd" {
-		t.Errorf("name = %q", p.name)
-	}
 	if p.discovery == nil || p.registry == nil {
 		t.Fatal("discovery and registry must be set")
 	}
@@ -143,9 +132,6 @@ func TestEtcdProviderConstruction(t *testing.T) {
 	// Pinning must not panic on the real registry type.
 	if err := p.pinAddress(&net.TCPAddr{IP: net.ParseIP("10.0.0.1"), Port: 8080}); err != nil {
 		t.Fatalf("pinAddress: %v", err)
-	}
-	if p.closeFn != nil {
-		t.Error("etcd provider must not claim an owned close in v0.2.6")
 	}
 }
 

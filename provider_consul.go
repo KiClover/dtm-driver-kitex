@@ -11,11 +11,9 @@ import (
 // onto registry-consul v0.2.0 objects.
 //
 // Design notes:
-//   - Consul talks HTTP, not raw TLS, so profile TLS paths are handed to
-//     consul's api.TLSConfig file fields; scheme=https selects the transport.
 //   - registry-consul's NewConsulRegister/NewConsulResolver only take an
 //     address, so both sides are built through the *WithConfig variants which
-//     share one api.Config (same datacenter/token/TLS on register+resolve).
+//     share one api.Config (same scheme/datacenter/token on register+resolve).
 //   - info.Addr is honored as-is (no pinAddress): consul's Register parses
 //     host and port from info.Addr directly.
 //   - The upstream TTL heartbeat is broken in registry-consul v0.2.0:
@@ -42,23 +40,6 @@ func newConsulConfig(dc *discoveryConfig, creds credentialProfile) (*consulapi.C
 	if creds.Token != "" {
 		cfg.Token = creds.Token
 	}
-
-	hasTLS := creds.TLSCA != "" || creds.TLSCert != "" || creds.TLSKey != ""
-	if hasTLS {
-		if cfg.Scheme != "https" {
-			return nil, fmt.Errorf("dtm-driver-kitex: TLS credentials require scheme=https")
-		}
-		// Strict validation without building a tls.Config: the consul API
-		// client consumes file paths and PEM material itself.
-		if (creds.TLSCert == "") != (creds.TLSKey == "") {
-			return nil, fmt.Errorf("dtm-driver-kitex: tls_cert and tls_key must be set together")
-		}
-		cfg.TLSConfig = consulapi.TLSConfig{
-			CAFile:   creds.TLSCA,
-			CertFile: creds.TLSCert,
-			KeyFile:  creds.TLSKey,
-		}
-	}
 	return cfg, nil
 }
 
@@ -80,10 +61,8 @@ func newConsulProvider(dc *discoveryConfig, creds credentialProfile) (*provider,
 		return nil, fmt.Errorf("dtm-driver-kitex: create consul registry: %w", err)
 	}
 	return &provider{
-		name:      "consul",
 		discovery: disc,
 		registry:  reg,
-		closeFn:   nil, // registry-consul v0.2.0 exposes no Close; TTL heartbeats stop at Deregister.
 	}, nil
 }
 

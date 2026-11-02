@@ -34,13 +34,3 @@ func ServerMetadataMiddleware(next endpoint.Endpoint) endpoint.Endpoint {
 		return next(grpcmetadata.NewIncomingContext(ctx, dst), req, resp)
 	}
 }
-
-// DTM transaction metadata keys sent by the DTM server on every branch call.
-const (
-	MetadataGid       = "dtm-gid"
-	MetadataTransType = "dtm-trans_type"
-	MetadataBranchID  = "dtm-branch_id"
-	MetadataOp        = "dtm-op"
-	MetadataDtm       = "dtm-dtm"
-	MetadataPhase2URL = "dtm-phase2_url"
-)

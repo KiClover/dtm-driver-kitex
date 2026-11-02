@@ -91,6 +91,10 @@ func TestParseTargetRejectsInvalid(t *testing.T) {
 		{"empty host", "kitex-etcd://:2379/svc/pkg.Svc/M"},
 		{"empty port", "kitex-etcd://127.0.0.1:/svc/pkg.Svc/M"},
 		{"bad endpoint port", "kitex-etcd://127.0.0.1:notaport/svc/pkg.Svc/M"},
+		{"credential profiles removed", "kitex-etcd://127.0.0.1:2379/svc/pkg.Svc/M?credential_profile=prod"},
+		{"malformed credential profile query", "kitex-etcd://127.0.0.1:2379/svc/pkg.Svc/M?credential_profile=prod;x=1"},
+		{"malformed credential query", "kitex-etcd://127.0.0.1:2379/svc/pkg.Svc/M?user=dtm;password=secret"},
+		{"malformed percent escape", "kitex-etcd://127.0.0.1:2379/svc/pkg.Svc/M?user=%zz"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -159,7 +163,7 @@ func TestCanonicalTarget(t *testing.T) {
 }
 
 func TestDriverParseServerMethod(t *testing.T) {
-	d := &Driver{}
+	d := &kitexDriver{}
 	svr, method, err := d.ParseServerMethod("kitex-etcd://10.0.0.1:2379/order-service/order.v1.OrderService/Create?refresh_interval=5s")
 	if err != nil {
 		t.Fatalf("ParseServerMethod: %v", err)

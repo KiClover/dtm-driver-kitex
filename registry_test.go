@@ -1,21 +1,18 @@
 package dtmkitex
 
 import (
-	"context"
 	"errors"
 	"net"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	. "github.com/dtm-labs/dtmdriver-kitex/internal/testkit"
 )
 
-// resetRegistrationState clears process-global provider and registration
-// state so tests are independent.
+// resetRegistrationState clears the process-global provider cache so tests are independent.
 func resetRegistrationState(t *testing.T) {
 	t.Helper()
-	defaultRegistrations.mu.Lock()
-	defaultRegistrations.entries = map[registrationKey]entry{}
-	defaultRegistrations.mu.Unlock()
 	defaultProviders.mu.Lock()
 	defaultProviders.providers = map[string]*provider{}
 	defaultProviders.mu.Unlock()
@@ -28,7 +25,6 @@ func installFakeProvider(t *testing.T, scheme string, reg *Registry, pin func(ne
 	prev, had := providerFactories[scheme]
 	providerFactories[scheme] = func(dc *discoveryConfig, creds credentialProfile) (*provider, error) {
 		return &provider{
-			name:       scheme,
 			discovery:  NewDiscovery(scheme, dc.service),
 			registry:   reg,
 			pinAddress: pin,
@@ -115,7 +111,7 @@ func TestNewRegistrationInfoHostnameAddr(t *testing.T) {
 	}
 }
 
-func TestRegisterServiceIdempotent(t *testing.T) {
+func TestRegisterServiceDelegatesEachCall(t *testing.T) {
 	resetRegistrationState(t)
 	reg := NewRegistry()
 	installFakeProvider(t, SchemeEtcd, reg, nil)
@@ -126,8 +122,48 @@ func TestRegisterServiceIdempotent(t *testing.T) {
 			t.Fatalf("call %d: %v", i, err)
 		}
 	}
-	if got := len(reg.Registers()); got != 1 {
-		t.Fatalf("Register called %d times, want 1", got)
+	if got := len(reg.Registers()); got != 3 {
+		t.Fatalf("Register called %d times, want 3", got)
+	}
+}
+
+func TestRegisterServiceSerializesPinAndRegister(t *testing.T) {
+	resetRegistrationState(t)
+	reg := NewRegistry()
+	firstPinned := make(chan struct{})
+	releaseFirst := make(chan struct{})
+	secondPinned := make(chan struct{}, 1)
+	var calls atomic.Int32
+	installFakeProvider(t, SchemeEtcd, reg, func(net.Addr) error {
+		if calls.Add(1) == 1 {
+			close(firstPinned)
+			<-releaseFirst
+			return nil
+		}
+		secondPinned <- struct{}{}
+		return nil
+	})
+
+	dc := mustConfig(t, SchemeEtcd+"://127.0.0.1:2379/svc")
+	errs := make(chan error, 2)
+	go func() { errs <- registerService(dc, credentialProfile{}, "127.0.0.1:8080") }()
+	<-firstPinned
+	go func() { errs <- registerService(dc, credentialProfile{}, "127.0.0.1:8081") }()
+
+	concurrent := false
+	select {
+	case <-secondPinned:
+		concurrent = true
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(releaseFirst)
+	for i := 0; i < 2; i++ {
+		if err := <-errs; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if concurrent {
+		t.Fatal("pin and Register were not serialized per provider")
 	}
 }
 
@@ -159,10 +195,6 @@ func TestRegisterServiceRegisterErrorPropagates(t *testing.T) {
 	if err == nil {
 		t.Fatal("want error from Register")
 	}
-	// A failed registration must not be remembered as live.
-	if got := len(defaultRegistrations.entries); got != 0 {
-		t.Fatalf("registrations = %d, want 0", got)
-	}
 }
 
 func TestRegisterServicePinsAddress(t *testing.T) {
@@ -180,68 +212,6 @@ func TestRegisterServicePinsAddress(t *testing.T) {
 	}
 	if pinned == nil || pinned.String() != "10.1.2.3:8080" {
 		t.Fatalf("pinned = %v, want 10.1.2.3:8080", pinned)
-	}
-}
-
-func TestShutdownDeregistersAll(t *testing.T) {
-	resetRegistrationState(t)
-	reg := NewRegistry()
-	installFakeProvider(t, SchemeEtcd, reg, nil)
-
-	dc := mustConfig(t, SchemeEtcd+"://127.0.0.1:2379/svc")
-	if err := registerService(dc, credentialProfile{}, "127.0.0.1:8080"); err != nil {
-		t.Fatal(err)
-	}
-	if err := (&Driver{}).Shutdown(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if got := len(reg.Deregisters()); got != 1 {
-		t.Fatalf("Deregister called %d times, want 1", got)
-	}
-	info, ok := reg.Deregisters()[0], true
-	_ = info
-	_ = ok
-	if len(reg.Deregisters()) != 1 {
-		t.Fatal("unreachable")
-	}
-	d := reg.Deregisters()[0]
-	if d.ServiceName != "svc" || d.Addr.String() != "127.0.0.1:8080" {
-		t.Fatalf("deregistered info = %+v", d)
-	}
-	// Shutdown is repeatable.
-	if err := (&Driver{}).Shutdown(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if got := len(reg.Deregisters()); got != 1 {
-		t.Fatalf("Deregister after second Shutdown = %d, want 1", got)
-	}
-}
-
-func TestShutdownContinuesOnDeregisterError(t *testing.T) {
-	resetRegistrationState(t)
-	reg1 := NewRegistry()
-	reg2 := NewRegistry()
-	installFakeProvider(t, SchemeEtcd, reg1, nil)
-	reg1.SetDeregisterError(errors.New("etcd down"))
-
-	dc := mustConfig(t, SchemeEtcd+"://127.0.0.1:2379/svc")
-	if err := registerService(dc, credentialProfile{}, "127.0.0.1:8080"); err != nil {
-		t.Fatal(err)
-	}
-
-	// Second registration via a second registry to see Shutdown continue.
-	installFakeProvider(t, SchemeConsul, reg2, nil)
-	dc2 := mustConfig(t, SchemeConsul+"://127.0.0.1:2379/svc2")
-	if err := registerService(dc2, credentialProfile{}, "127.0.0.1:8081"); err != nil {
-		t.Fatal(err)
-	}
-
-	err := (&Driver{}).Shutdown(context.Background())
-	if err == nil {
-		t.Fatal("want first deregister error surfaced")
-	}
-	if got := len(reg2.Deregisters()); got != 1 {
-		t.Fatalf("second registry Deregister = %d, want 1 despite first failure", got)
 	}
 }
 

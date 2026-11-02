@@ -23,8 +23,7 @@ import (
 //     construction failures only come from client creation.
 //   - nacos-sdk-go v1's INamingClient exposes no Close; the SDK's background
 //     threads (beat reactor, host reactor update thread, push receiver) live
-//     for the process lifetime. closeFn stays nil. The v2 SDK has Close but
-//     requires a newer Kitex than this driver pins.
+//     for the process lifetime. The v2 SDK requires a newer Kitex.
 //   - Resolve reports instance loss as an error ("no instance remains"), not
 //     as an authoritative empty Result, so the resolver's empty-grace path is
 //     never exercised by nacos: the error path (keep last state, ReportError,
@@ -86,9 +85,6 @@ func newNacosConfig(dc *discoveryConfig, creds credentialProfile) (*constant.Cli
 		LogLevel:             "warn",
 	}
 	cfg.NamespaceId = dc.query.Get("namespace")
-	if cfg.NamespaceId == "" {
-		cfg.NamespaceId = creds.Namespace
-	}
 	return cfg, servers, nil
 }
 
@@ -117,10 +113,8 @@ func newNacosProvider(dc *discoveryConfig, creds credentialProfile) (*provider, 
 		registry.WithCluster(cluster),
 	)
 	return &provider{
-		name:      "nacos",
 		discovery: disc,
 		registry:  reg,
-		closeFn:   nil, // nacos-sdk-go v1 exposes no Close; see design notes.
 	}, nil
 }
 

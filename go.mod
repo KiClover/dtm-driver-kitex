@@ -15,7 +15,6 @@ require (
 	go.etcd.io/etcd/client/v3 v3.5.12
 	google.golang.org/grpc v1.59.0
 	google.golang.org/protobuf v1.33.0
-	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -107,6 +106,7 @@ require (
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/ini.v1 v1.66.6 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 replace github.com/bytedance/sonic => github.com/bytedance/sonic v1.12.7

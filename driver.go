@@ -1,64 +1,42 @@
-// Package dtmkitex implements a dtmdriver.Driver that lets DTM call Kitex
-// services over standard gRPC transport, discovered through Kitex registry
-// layouts (etcd, Consul, Nacos).
+// Package dtmkitex connects DTM to Kitex standard gRPC services through
+// etcd, Consul, or Nacos discovery.
 package dtmkitex
 
-import (
-	dtmdriver "github.com/dtm-labs/dtmdriver"
-)
+import "github.com/dtm-labs/dtmdriver"
 
-// DriverName is the name registered with dtmdriver.
 const DriverName = "dtm-driver-kitex"
 
-// Supported registry URI schemes.
 const (
 	SchemeEtcd   = "kitex-etcd"
 	SchemeConsul = "kitex-consul"
 	SchemeNacos  = "kitex-nacos"
 )
 
-// Driver implements dtmdriver.Driver for Kitex standard gRPC services.
-type Driver struct{}
+type kitexDriver struct{}
 
-// GetName returns DriverName.
-func (d *Driver) GetName() string { return DriverName }
+func (d *kitexDriver) GetName() string { return DriverName }
 
-// RegisterAddrResolver is a no-op: the dedicated resolver schemes are
-// registered once in package init because grpc-go's resolver registry is
-// process-global and not safe for runtime re-registration.
-func (d *Driver) RegisterAddrResolver() {}
+// grpc-go's resolver registry is process-global; schemes are registered once
+// by resolverBuilder's package initializer.
+func (d *kitexDriver) RegisterAddrResolver() {}
 
-// RegisterService registers the DTM server endpoint under the given target.
-func (d *Driver) RegisterService(target string, endpoint string) error {
-	defaultConfig.start()
+func (d *kitexDriver) RegisterService(target, endpoint string) error {
 	rt, err := parseRegistrationTarget(target)
 	if err != nil {
 		return err
 	}
 	dc := rt.discovery
-	creds, err := defaultConfig.resolveCredentials(dc)
-	if err != nil {
-		return err
-	}
-	return registerService(dc, creds, endpoint)
+	return registerService(dc, inlineCredentials(dc), endpoint)
 }
 
-// ParseServerMethod splits a branch URL into the resolver target and the
-// fully-qualified gRPC method.
-func (d *Driver) ParseServerMethod(uri string) (server string, method string, err error) {
+func (d *kitexDriver) ParseServerMethod(uri string) (server, method string, err error) {
 	bt, err := parseBranchTarget(uri)
 	if err != nil {
 		return "", "", err
 	}
-	defaultConfig.start()
 	return bt.server, bt.method, nil
 }
 
-// Builder adapts a Kitex discovery resolver into a grpc-go resolver builder.
-// It is retained as a public alias for documentation; the concrete builder is
-// resolverBuilder in resolver_builder.go.
-type Builder = resolverBuilder
-
 func init() {
-	dtmdriver.Register(&Driver{})
+	dtmdriver.Register(&kitexDriver{})
 }

@@ -36,19 +36,17 @@ type discoveryConfig struct {
 
 // sensitiveQueryKeys never appear in cache keys or error output.
 var sensitiveQueryKeys = map[string]bool{
-	"user":               true,
-	"password":           true,
-	"token":              true,
-	"username":           true,
-	"credential_profile": true,
+	"user":     true,
+	"password": true,
+	"token":    true,
+	"username": true,
 }
 
 // commonQueryKeys are accepted by every registry scheme.
 var commonQueryKeys = map[string]bool{
-	"refresh_interval":   true,
-	"empty_grace":        true,
-	"default_weight":     true,
-	"credential_profile": true,
+	"refresh_interval": true,
+	"empty_grace":      true,
+	"default_weight":   true,
 }
 
 // schemeQueryKeys lists the scheme-specific accepted query keys.
@@ -194,7 +192,11 @@ func parseRegistryTarget(raw string, withMethod bool) (*discoveryConfig, string,
 		}
 	}
 
-	query, err := parseQuery(u.Scheme, u.Query())
+	values, err := url.ParseQuery(u.RawQuery)
+	if err != nil {
+		return nil, "", fmt.Errorf("dtm-driver-kitex: invalid query encoding")
+	}
+	query, err := parseQuery(u.Scheme, values)
 	if err != nil {
 		return nil, "", err
 	}
@@ -365,8 +367,8 @@ func (dc *discoveryConfig) serverString() string {
 	return b.String()
 }
 
-// canonicalKey returns a stable, secret-free identity for caching and
-// deduplication. Sensitive values are replaced by a marker.
+// canonicalKey returns a stable, secret-free target identity for caching.
+// Sensitive values are replaced by a marker; provider.go adds their digest.
 func (dc *discoveryConfig) canonicalKey() string {
 	endpoints := append([]string(nil), dc.endpoints...)
 	sort.Strings(endpoints)

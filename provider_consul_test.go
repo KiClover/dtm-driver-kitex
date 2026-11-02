@@ -1,10 +1,6 @@
 package dtmkitex
 
-import (
-	"os"
-	"path/filepath"
-	"testing"
-)
+import "testing"
 
 func consulDC(t *testing.T, raw string) *discoveryConfig {
 	t.Helper()
@@ -64,55 +60,17 @@ func TestConsulConfigBadScheme(t *testing.T) {
 	}
 }
 
-func TestConsulConfigTLSRequiresHTTPS(t *testing.T) {
-	dc := consulDC(t, "kitex-consul://127.0.0.1:8500/svc")
-	if _, err := newConsulConfig(dc, credentialProfile{TLSCA: "ca.pem"}); err == nil {
-		t.Fatal("TLS material without scheme=https must be rejected")
-	}
-}
-
-func TestConsulConfigTLSFiles(t *testing.T) {
-	dir := t.TempDir()
-	ca := filepath.Join(dir, "ca.pem")
-	cert := filepath.Join(dir, "cert.pem")
-	key := filepath.Join(dir, "key.pem")
-	for _, f := range []string{ca, cert, key} {
-		if err := os.WriteFile(f, []byte("placeholder"), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	dc := consulDC(t, "kitex-consul://127.0.0.1:8500/svc?scheme=https")
-	cfg, err := newConsulConfig(dc, credentialProfile{TLSCA: ca, TLSCert: cert, TLSKey: key})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.TLSConfig.CAFile != ca || cfg.TLSConfig.CertFile != cert || cfg.TLSConfig.KeyFile != key {
-		t.Fatalf("tls config = %+v", cfg.TLSConfig)
-	}
-
-	// cert without key is a deterministic construction error.
-	if _, err := newConsulConfig(dc, credentialProfile{TLSCA: ca, TLSCert: cert}); err == nil {
-		t.Fatal("tls_cert without tls_key must be rejected")
-	}
-}
-
 func TestConsulProviderConstruction(t *testing.T) {
 	dc := consulDC(t, "kitex-consul://127.0.0.1:8500/svc")
 	p, err := newConsulProvider(dc, credentialProfile{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.name != "consul" {
-		t.Errorf("name = %q", p.name)
-	}
 	if p.discovery == nil || p.registry == nil {
 		t.Fatal("discovery and registry must be set")
 	}
 	if p.pinAddress != nil {
 		t.Error("consul provider must not pin registration addresses")
-	}
-	if p.closeFn != nil {
-		t.Error("consul provider must not claim an owned close in v0.2.0")
 	}
 }
 
@@ -129,8 +87,5 @@ func TestConsulProviderSharedViaCache(t *testing.T) {
 	}
 	if p1 != p2 {
 		t.Error("same canonical config must share one provider")
-	}
-	if p1.name != "consul" {
-		t.Errorf("cached provider name = %q", p1.name)
 	}
 }

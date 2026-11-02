@@ -10,7 +10,7 @@ import (
 )
 
 func TestDriverName(t *testing.T) {
-	d := &Driver{}
+	d := &kitexDriver{}
 	if got := d.GetName(); got != DriverName {
 		t.Fatalf("GetName() = %q, want %q", got, DriverName)
 	}
@@ -41,13 +41,13 @@ func TestResolverSchemesRegistered(t *testing.T) {
 }
 
 func TestRegisterAddrResolverIdempotent(t *testing.T) {
-	d := &Driver{}
+	d := &kitexDriver{}
 	d.RegisterAddrResolver()
 	d.RegisterAddrResolver()
 }
 
 func TestRegisterAddrResolverConcurrent(t *testing.T) {
-	d := &Driver{}
+	d := &kitexDriver{}
 	var wg sync.WaitGroup
 	for i := 0; i < 16; i++ {
 		wg.Add(1)
@@ -57,12 +57,4 @@ func TestRegisterAddrResolverConcurrent(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-}
-
-func TestPackageConfigureShutdownDelegate(t *testing.T) {
-	// Package-level Configure/Shutdown must exist and delegate to the same
-	// default driver instance (compile-time check plus smoke call).
-	if err := Configure(Config{}); err != nil {
-		t.Fatalf("Configure(Config{}) = %v", err)
-	}
 }
