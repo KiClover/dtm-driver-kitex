@@ -117,6 +117,16 @@ func TestConsulDiscoverAndCall(t *testing.T) {
 	if err := new(dtmkitex.Driver).RegisterService(target, registerAddr); err != nil {
 		t.Fatalf("RegisterService: %v", err)
 	}
+	// The agent-side TCP check needs a few seconds to turn passing; the
+	// consul resolver reports "no service found" until then, so wait before
+	// dialing instead of relying on resolver error retries.
+	deadline := time.Now().Add(10 * time.Second)
+	for !consulHasService(t, "dtm-consul-gate") {
+		if time.Now().After(deadline) {
+			t.Fatalf("registered instance never passed the consul health check")
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
 
 	conn, err := grpcDial("kitex-consul://127.0.0.1:18500/dtm-consul-gate?refresh_interval=500ms")
 	if err != nil {
