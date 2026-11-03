@@ -58,3 +58,10 @@ func TestRegisterAddrResolverConcurrent(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+func TestRegisterServiceEmptyTargetIsNoop(t *testing.T) {
+	d := &kitexDriver{}
+	if err := d.RegisterService("", "not-an-endpoint"); err != nil {
+		t.Fatalf("RegisterService with empty target = %v, want nil", err)
+	}
+}

@@ -45,6 +45,9 @@ func buildEtcdOptions(dc *discoveryConfig, creds credentialProfile, includeDefau
 	return opts, etcdCfg, nil
 }
 
+// newEtcdDiscovery builds the etcd discovery resolver. The registry-etcd
+// version used here exposes no Close, so the discovery resolver lives for the
+// process lifetime and is safe to reuse across services.
 func newEtcdDiscovery(dc *discoveryConfig, creds credentialProfile) (discovery.Resolver, error) {
 	opts, _, err := buildEtcdOptions(dc, creds, true)
 	if err != nil {
@@ -57,6 +60,9 @@ func newEtcdDiscovery(dc *discoveryConfig, creds credentialProfile) (discovery.R
 	return resolver, nil
 }
 
+// newEtcdRegistration builds the etcd registration provider. The registry holds
+// mutable service state (meta, lease, keepalive goroutines), so each service
+// requires its own registry instance.
 func newEtcdRegistration(dc *discoveryConfig, creds credentialProfile) (*registrationProvider, error) {
 	opts, _, err := buildEtcdOptions(dc, creds, false)
 	if err != nil {

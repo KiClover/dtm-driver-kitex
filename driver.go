@@ -21,6 +21,10 @@ func (d *kitexDriver) GetName() string { return DriverName }
 func (d *kitexDriver) RegisterAddrResolver() {}
 
 func (d *kitexDriver) RegisterService(target, endpoint string) error {
+	if target == "" {
+		return nil
+	}
+
 	rt, err := parseRegistrationTarget(target)
 	if err != nil {
 		return err
