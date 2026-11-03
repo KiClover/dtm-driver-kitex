@@ -1,3 +1,5 @@
+English | [简体中文](README.zh-CN.md)
+
 # dtm-driver-kitex
 
 [DTM](https://github.com/dtm-labs/dtm) driver for Kitex protobuf services that use standard gRPC over HTTP/2. It lets DTM register itself and resolve branch URLs through Kitex-compatible etcd, Consul, or Nacos registries.
