@@ -7,36 +7,51 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/discovery"
 	. "github.com/dtm-labs/dtmdriver-kitex/internal/testkit"
 )
 
-// resetRegistrationState clears the process-global provider cache so tests are independent.
+// resetRegistrationState clears both process-global caches so tests are independent.
 func resetRegistrationState(t *testing.T) {
 	t.Helper()
-	defaultProviders.mu.Lock()
-	defaultProviders.providers = map[string]*provider{}
-	defaultProviders.mu.Unlock()
+	defaultDiscoveries.mu.Lock()
+	defaultDiscoveries.resolvers = map[string]discovery.Resolver{}
+	defaultDiscoveries.mu.Unlock()
+	defaultRegistrations.mu.Lock()
+	defaultRegistrations.providers = map[string]*registrationProvider{}
+	defaultRegistrations.mu.Unlock()
 }
 
-// installFakeProvider installs a factory returning the fake registry-backed
-// provider for scheme.
-func installFakeProvider(t *testing.T, scheme string, reg *Registry, pin func(net.Addr) error) {
+func installFakeFactories(t *testing.T, scheme string, discoveryFactory discoveryFactory, registrationFactory registrationFactory) {
 	t.Helper()
-	prev, had := providerFactories[scheme]
-	providerFactories[scheme] = func(dc *discoveryConfig, creds credentialProfile) (*provider, error) {
-		return &provider{
-			discovery:  NewDiscovery(scheme, dc.service),
-			registry:   reg,
-			pinAddress: pin,
-		}, nil
-	}
+	previousDiscovery, hadDiscovery := discoveryFactories[scheme]
+	previousRegistration, hadRegistration := registrationFactories[scheme]
+	discoveryFactories[scheme] = discoveryFactory
+	registrationFactories[scheme] = registrationFactory
 	t.Cleanup(func() {
-		if had {
-			providerFactories[scheme] = prev
+		if hadDiscovery {
+			discoveryFactories[scheme] = previousDiscovery
 		} else {
-			delete(providerFactories, scheme)
+			delete(discoveryFactories, scheme)
+		}
+		if hadRegistration {
+			registrationFactories[scheme] = previousRegistration
+		} else {
+			delete(registrationFactories, scheme)
 		}
 	})
+}
+
+func installFakeProvider(t *testing.T, scheme string, reg *Registry, pin func(net.Addr) error) {
+	t.Helper()
+	installFakeFactories(t, scheme,
+		func(dc *discoveryConfig, _ credentialProfile) (discovery.Resolver, error) {
+			return NewDiscovery(scheme, dc.service), nil
+		},
+		func(*discoveryConfig, credentialProfile) (*registrationProvider, error) {
+			return &registrationProvider{registry: reg, pinAddress: pin}, nil
+		},
+	)
 }
 
 func TestNewRegistrationInfoValidation(t *testing.T) {

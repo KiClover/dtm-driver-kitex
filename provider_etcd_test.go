@@ -114,39 +114,48 @@ func TestEtcdOptionsNoWeightOptionByDefault(t *testing.T) {
 	}
 }
 
-// TestEtcdProviderConstruction relies on clientv3.New being lazy: no
-// connection is made until the first RPC, so an unreachable endpoint is
-// fine here.
-func TestEtcdProviderConstruction(t *testing.T) {
+// Etcd client construction is lazy: no connection is made until the first
+// RPC, so an unreachable endpoint is fine in these constructor tests.
+func TestEtcdDiscoveryConstruction(t *testing.T) {
 	dc := etcdDC(t, "kitex-etcd://127.0.0.1:1/svc?dial_timeout=100ms")
-	p, err := newEtcdProvider(dc, credentialProfile{})
+	resolver, err := newEtcdDiscovery(dc, credentialProfile{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.discovery == nil || p.registry == nil {
-		t.Fatal("discovery and registry must be set")
+	if resolver == nil {
+		t.Fatal("discovery resolver must be set")
 	}
-	if p.pinAddress == nil {
+}
+
+func TestEtcdRegistrationConstruction(t *testing.T) {
+	dc := etcdDC(t, "kitex-etcd://127.0.0.1:1/svc?dial_timeout=100ms")
+	provider, err := newEtcdRegistration(dc, credentialProfile{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if provider == nil || provider.registry == nil {
+		t.Fatal("registration provider must be set")
+	}
+	if provider.pinAddress == nil {
 		t.Fatal("etcd provider must pin registration addresses")
 	}
-	// Pinning must not panic on the real registry type.
-	if err := p.pinAddress(&net.TCPAddr{IP: net.ParseIP("10.0.0.1"), Port: 8080}); err != nil {
+	if err := provider.pinAddress(&net.TCPAddr{IP: net.ParseIP("10.0.0.1"), Port: 8080}); err != nil {
 		t.Fatalf("pinAddress: %v", err)
 	}
 }
 
-func TestEtcdProviderSharedViaCache(t *testing.T) {
+func TestEtcdDiscoverySharedViaCache(t *testing.T) {
 	resetRegistrationState(t)
 	dc := etcdDC(t, "kitex-etcd://127.0.0.1:1/svc?dial_timeout=100ms")
-	p1, err := defaultProviders.get(dc, credentialProfile{})
+	first, err := defaultDiscoveries.get(dc, credentialProfile{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	p2, err := defaultProviders.get(dc, credentialProfile{})
+	again, err := defaultDiscoveries.get(dc, credentialProfile{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p1 != p2 {
-		t.Error("same canonical config must share one provider")
+	if first != again {
+		t.Error("same effective config must share one discovery resolver")
 	}
 }

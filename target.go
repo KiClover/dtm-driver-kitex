@@ -367,8 +367,21 @@ func (dc *discoveryConfig) serverString() string {
 	return b.String()
 }
 
-// canonicalKey returns a stable, secret-free target identity for caching.
-// Sensitive values are replaced by a marker; provider.go adds their digest.
+var discoveryCacheQueryKeys = map[string][]string{
+	SchemeEtcd:   {"dial_timeout", "prefix", "default_weight"},
+	SchemeConsul: {"scheme", "datacenter"},
+	SchemeNacos:  {"namespace", "group", "cluster"},
+}
+
+var registrationCacheQueryKeys = map[string][]string{
+	SchemeEtcd:   {"dial_timeout", "prefix"},
+	SchemeConsul: {"scheme", "datacenter"},
+	SchemeNacos:  {"namespace", "group", "cluster"},
+}
+
+// canonicalKey returns the complete stable, secret-free target identity. It is
+// retained for diagnostics and compatibility with existing internal tests; the
+// provider caches use the narrower identities below.
 func (dc *discoveryConfig) canonicalKey() string {
 	endpoints := append([]string(nil), dc.endpoints...)
 	sort.Strings(endpoints)
@@ -384,6 +397,33 @@ func (dc *discoveryConfig) canonicalKey() string {
 		}
 	}
 	return dc.scheme + "|" + strings.Join(endpoints, ",") + "|" + dc.service + "|" + safe.Encode()
+}
+
+func (dc *discoveryConfig) discoveryCacheKey() string {
+	return dc.cacheKey(discoveryCacheQueryKeys[dc.scheme], false)
+}
+
+func (dc *discoveryConfig) registrationCacheKey() string {
+	return dc.cacheKey(registrationCacheQueryKeys[dc.scheme], true)
+}
+
+func (dc *discoveryConfig) cacheKey(queryKeys []string, includeService bool) string {
+	endpoints := append([]string(nil), dc.endpoints...)
+	sort.Strings(endpoints)
+
+	projected := url.Values{}
+	for _, key := range queryKeys {
+		for _, value := range dc.query[key] {
+			projected.Add(key, value)
+		}
+	}
+
+	parts := []string{dc.scheme, strings.Join(endpoints, ",")}
+	if includeService {
+		parts = append(parts, dc.service)
+	}
+	parts = append(parts, projected.Encode())
+	return strings.Join(parts, "|")
 }
 
 // refreshInterval returns the configured refresh interval or the default.

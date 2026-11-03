@@ -60,32 +60,43 @@ func TestConsulConfigBadScheme(t *testing.T) {
 	}
 }
 
-func TestConsulProviderConstruction(t *testing.T) {
+func TestConsulDiscoveryConstruction(t *testing.T) {
 	dc := consulDC(t, "kitex-consul://127.0.0.1:8500/svc")
-	p, err := newConsulProvider(dc, credentialProfile{})
+	resolver, err := newConsulDiscovery(dc, credentialProfile{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.discovery == nil || p.registry == nil {
-		t.Fatal("discovery and registry must be set")
+	if resolver == nil {
+		t.Fatal("discovery resolver must be set")
 	}
-	if p.pinAddress != nil {
+}
+
+func TestConsulRegistrationConstruction(t *testing.T) {
+	dc := consulDC(t, "kitex-consul://127.0.0.1:8500/svc")
+	provider, err := newConsulRegistration(dc, credentialProfile{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if provider == nil || provider.registry == nil {
+		t.Fatal("registration provider must be set")
+	}
+	if provider.pinAddress != nil {
 		t.Error("consul provider must not pin registration addresses")
 	}
 }
 
-func TestConsulProviderSharedViaCache(t *testing.T) {
+func TestConsulDiscoverySharedViaCache(t *testing.T) {
 	resetRegistrationState(t)
 	dc := consulDC(t, "kitex-consul://127.0.0.1:8500/svc")
-	p1, err := defaultProviders.get(dc, credentialProfile{})
+	first, err := defaultDiscoveries.get(dc, credentialProfile{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	p2, err := defaultProviders.get(dc, credentialProfile{})
+	again, err := defaultDiscoveries.get(dc, credentialProfile{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p1 != p2 {
-		t.Error("same canonical config must share one provider")
+	if first != again {
+		t.Error("same effective config must share one discovery resolver")
 	}
 }

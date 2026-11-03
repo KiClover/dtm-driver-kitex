@@ -5,21 +5,23 @@ import (
 	"net"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/discovery"
 	etcd "github.com/kitex-contrib/registry-etcd"
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 // newEtcdOptions maps the normalized URI config and credentials onto
-// registry-etcd's exported Config. The URI controls endpoints, authentication,
-// dial timeout, and service discovery behavior.
+// registry-etcd's exported Config. It includes resolver default weight.
 func newEtcdOptions(dc *discoveryConfig, creds credentialProfile) ([]etcd.Option, *clientv3.Config, error) {
+	return buildEtcdOptions(dc, creds, true)
+}
+
+func buildEtcdOptions(dc *discoveryConfig, creds credentialProfile, includeDefaultWeight bool) ([]etcd.Option, *clientv3.Config, error) {
 	etcdCfg := &clientv3.Config{
 		Endpoints:   append([]string(nil), dc.endpoints...),
 		DialTimeout: 5 * time.Second,
 	}
 	if dc.query.Has("dial_timeout") {
-		// The parser guarantees a valid, in-range duration; a defensive
-		// parse failure keeps the 5s default instead of zeroing it.
 		if d, err := time.ParseDuration(dc.query.Get("dial_timeout")); err == nil && d > 0 {
 			etcdCfg.DialTimeout = d
 		}
@@ -35,34 +37,39 @@ func newEtcdOptions(dc *discoveryConfig, creds credentialProfile) ([]etcd.Option
 	if prefix := dc.query.Get("prefix"); prefix != "" {
 		opts = append(opts, etcd.WithEtcdServicePrefix(prefix))
 	}
-	if w := dc.weight(); w > 0 && dc.query.Has("default_weight") {
-		opts = append(opts, etcd.WithDefaultWeight(w))
+	if includeDefaultWeight {
+		if w := dc.weight(); w > 0 && dc.query.Has("default_weight") {
+			opts = append(opts, etcd.WithDefaultWeight(w))
+		}
 	}
 	return opts, etcdCfg, nil
 }
 
-// newEtcdProvider builds the etcd discovery resolver and registry. The
-// registry-etcd version used here exposes no Close, so the shared clients live
-// for the process lifetime and leases reclaim registrations after process loss.
-func newEtcdProvider(dc *discoveryConfig, creds credentialProfile) (*provider, error) {
-	opts, _, err := newEtcdOptions(dc, creds)
+func newEtcdDiscovery(dc *discoveryConfig, creds credentialProfile) (discovery.Resolver, error) {
+	opts, _, err := buildEtcdOptions(dc, creds, true)
 	if err != nil {
 		return nil, err
 	}
-	endpoints := append([]string(nil), dc.endpoints...)
-	disc, err := etcd.NewEtcdResolver(endpoints, opts...)
+	resolver, err := etcd.NewEtcdResolver(append([]string(nil), dc.endpoints...), opts...)
 	if err != nil {
 		return nil, fmt.Errorf("dtm-driver-kitex: create etcd resolver: %w", err)
 	}
-	reg, err := etcd.NewEtcdRegistry(endpoints, opts...)
+	return resolver, nil
+}
+
+func newEtcdRegistration(dc *discoveryConfig, creds credentialProfile) (*registrationProvider, error) {
+	opts, _, err := buildEtcdOptions(dc, creds, false)
+	if err != nil {
+		return nil, err
+	}
+	registry, err := etcd.NewEtcdRegistry(append([]string(nil), dc.endpoints...), opts...)
 	if err != nil {
 		return nil, fmt.Errorf("dtm-driver-kitex: create etcd registry: %w", err)
 	}
-	return &provider{
-		discovery: disc,
-		registry:  reg,
+	return &registrationProvider{
+		registry: registry,
 		pinAddress: func(addr net.Addr) error {
-			etcd.SetFixedAddress(reg, addr)
+			etcd.SetFixedAddress(registry, addr)
 			return nil
 		},
 	}, nil
@@ -79,5 +86,5 @@ func mustTCPAddr(addr string) net.Addr {
 }
 
 func init() {
-	registerProviderFactory(SchemeEtcd, newEtcdProvider)
+	registerProviderFactories(SchemeEtcd, newEtcdDiscovery, newEtcdRegistration)
 }

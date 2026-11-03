@@ -123,41 +123,48 @@ func TestNacosEndpointValidation(t *testing.T) {
 	}
 }
 
-// TestNacosProviderConstruction builds a provider against an unreachable
-// server: SDK client construction must not dial.
-func TestNacosProviderConstruction(t *testing.T) {
-	dc := &discoveryConfig{
+func nacosConstructorConfig() *discoveryConfig {
+	return &discoveryConfig{
 		scheme:    SchemeNacos,
 		endpoints: []string{"127.0.0.1:18848"},
 		service:   "svc",
 		query:     url.Values{},
-	}
-	p, err := newNacosProvider(dc, credentialProfile{})
-	if err != nil {
-		t.Fatalf("newNacosProvider: %v", err)
-	}
-	if p.discovery == nil || p.registry == nil {
-		t.Fatal("provider missing discovery or registry")
 	}
 }
 
-// TestNacosProviderSharedViaCache returns one provider per canonical key.
-func TestNacosProviderSharedViaCache(t *testing.T) {
-	dc := &discoveryConfig{
-		scheme:    SchemeNacos,
-		endpoints: []string{"127.0.0.1:18848"},
-		service:   "svc",
-		query:     url.Values{},
+// SDK client construction must not dial the unreachable test endpoint.
+func TestNacosDiscoveryConstruction(t *testing.T) {
+	resolver, err := newNacosDiscovery(nacosConstructorConfig(), credentialProfile{})
+	if err != nil {
+		t.Fatalf("newNacosDiscovery: %v", err)
 	}
-	p1, err := defaultProviders.get(dc, credentialProfile{})
+	if resolver == nil {
+		t.Fatal("discovery resolver must be set")
+	}
+}
+
+func TestNacosRegistrationConstruction(t *testing.T) {
+	provider, err := newNacosRegistration(nacosConstructorConfig(), credentialProfile{})
+	if err != nil {
+		t.Fatalf("newNacosRegistration: %v", err)
+	}
+	if provider == nil || provider.registry == nil {
+		t.Fatal("registration provider must be set")
+	}
+}
+
+func TestNacosDiscoverySharedViaCache(t *testing.T) {
+	resetRegistrationState(t)
+	dc := nacosConstructorConfig()
+	first, err := defaultDiscoveries.get(dc, credentialProfile{})
 	if err != nil {
 		t.Fatalf("first get: %v", err)
 	}
-	p2, err := defaultProviders.get(dc, credentialProfile{})
+	again, err := defaultDiscoveries.get(dc, credentialProfile{})
 	if err != nil {
 		t.Fatalf("second get: %v", err)
 	}
-	if p1 != p2 {
-		t.Error("same config returned distinct providers")
+	if first != again {
+		t.Error("same effective config returned distinct discovery resolvers")
 	}
 }
